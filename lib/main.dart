@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:trustprobe_ai/app/app.locator.dart';
 import 'package:trustprobe_ai/app/app.router.dart';
+import 'package:trustprobe_ai/services/device_id_service.dart';
 import 'package:stacked_services/stacked_services.dart';
 
 void main() async {
@@ -21,6 +22,9 @@ void main() async {
 
   // Setup Stacked locator (dependency injection)
   setupLocator();
+
+  // Initialize device ID for anonymous scan tracking
+  await locator<DeviceIdService>().initialize();
 
   runApp(const MyApp());
 }

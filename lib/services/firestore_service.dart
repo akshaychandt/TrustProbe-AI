@@ -5,7 +5,8 @@ import '../models/scan_result.dart';
 
 /// FirestoreService - Manages Firebase Firestore operations
 ///
-/// Handles saving and retrieving URL scan results from Firestore
+/// Handles saving and retrieving URL scan results from Firestore,
+/// scoped by device ID for per-device history.
 class FirestoreService {
   final _firestore = FirebaseFirestore.instance;
 
@@ -20,12 +21,16 @@ class FirestoreService {
     }
   }
 
-  /// Get previous scan results as a stream
+  /// Get previous scan results as a stream, filtered by device ID
   /// Returns empty stream if Firebase is not configured
-  Stream<List<ScanResult>> getPreviousScans({int limit = 50}) {
+  Stream<List<ScanResult>> getPreviousScans({
+    required String deviceId,
+    int limit = 50,
+  }) {
     try {
       return _firestore
           .collection(_collectionName)
+          .where('deviceId', isEqualTo: deviceId)
           .orderBy('timestamp', descending: true)
           .limit(limit)
           .snapshots()

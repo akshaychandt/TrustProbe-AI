@@ -2,6 +2,7 @@ import 'package:inline_logger/inline_logger.dart';
 
 import 'package:stacked/stacked.dart';
 import 'package:trustprobe_ai/app/app.locator.dart';
+import 'package:trustprobe_ai/services/device_id_service.dart';
 import 'package:trustprobe_ai/services/phishing_service.dart';
 import 'package:trustprobe_ai/services/firestore_service.dart';
 import 'package:trustprobe_ai/models/scan_result.dart';
@@ -12,6 +13,7 @@ import 'package:trustprobe_ai/models/scan_result.dart';
 class HomeViewModel extends BaseViewModel {
   final _phishingService = locator<PhishingService>();
   final _firestoreService = locator<FirestoreService>();
+  final _deviceIdService = locator<DeviceIdService>();
 
   // State variables
   String _urlInput = '';
@@ -26,10 +28,10 @@ class HomeViewModel extends BaseViewModel {
   @override
   bool get hasError => _errorMessage != null;
 
-  /// Stream of previous scan results from Firestore
-  Stream<List<ScanResult>> get previousScans {
-    return _firestoreService.getPreviousScans();
-  }
+  /// Stream of previous scan results from Firestore, cached to avoid
+  /// recreating on every rebuild (which causes the loading spinner to flash)
+  late final Stream<List<ScanResult>> previousScans = _firestoreService
+      .getPreviousScans(deviceId: _deviceIdService.deviceId);
 
   /// Update URL input
   void updateUrlInput(String value) {
@@ -59,13 +61,13 @@ class HomeViewModel extends BaseViewModel {
       // Analyze URL using PhishingService
       final result = await _phishingService.analyzeUrl(_urlInput);
 
-      // Update current result
-      _currentResult = result;
+      // Attach device ID and update current result
+      _currentResult = result.copyWith(deviceId: _deviceIdService.deviceId);
 
       // Save to Firestore (non-blocking, with timeout)
       // Don't await - let it save in background
       _firestoreService
-          .saveScanResult(result)
+          .saveScanResult(_currentResult!)
           .timeout(
             const Duration(seconds: 2),
             onTimeout: () {

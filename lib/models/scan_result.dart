@@ -5,6 +5,7 @@ class ScanResult {
   final String reason;
   final DateTime timestamp;
   final String? aiAnalysis;
+  final String? deviceId;
   final Map<String, int> scoreBreakdown;
 
   const ScanResult({
@@ -14,6 +15,7 @@ class ScanResult {
     required this.reason,
     required this.timestamp,
     this.aiAnalysis,
+    this.deviceId,
     this.scoreBreakdown = const {},
   });
 
@@ -25,6 +27,7 @@ class ScanResult {
     String? reason,
     DateTime? timestamp,
     String? aiAnalysis,
+    String? deviceId,
     Map<String, int>? scoreBreakdown,
   }) => ScanResult(
     url: url ?? this.url,
@@ -33,6 +36,7 @@ class ScanResult {
     reason: reason ?? this.reason,
     timestamp: timestamp ?? this.timestamp,
     aiAnalysis: aiAnalysis ?? this.aiAnalysis,
+    deviceId: deviceId ?? this.deviceId,
     scoreBreakdown: scoreBreakdown ?? this.scoreBreakdown,
   );
 
@@ -44,6 +48,7 @@ class ScanResult {
     reason: data['reason'] as String,
     timestamp: DateTime.parse(data['timestamp'] as String),
     aiAnalysis: data['aiAnalysis'] as String?,
+    deviceId: data['deviceId'] as String?,
     scoreBreakdown:
         (data['scoreBreakdown'] as Map<String, dynamic>?)?.map(
           (k, v) => MapEntry(k, v as int),
@@ -59,6 +64,7 @@ class ScanResult {
     'reason': reason,
     'timestamp': timestamp.toIso8601String(),
     if (aiAnalysis != null) 'aiAnalysis': aiAnalysis,
+    if (deviceId != null) 'deviceId': deviceId,
     if (scoreBreakdown.isNotEmpty) 'scoreBreakdown': scoreBreakdown,
   };
 

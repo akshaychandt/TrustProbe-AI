@@ -39,7 +39,7 @@ Enter any URL and get an instant risk assessment with a detailed breakdown of wh
 | 🏷️ **Smart Classification** | Clear **Safe** / **Suspicious** / **Malicious** categorization |
 | 📝 **Human-Readable Explanations** | Detailed reasoning for every classification decision |
 | 🧮 **Score Breakdown** | Transparent breakdown showing exactly which checks contributed to the score |
-| 📚 **Search History** | Previous scans stored and streamed in real-time from Firebase Firestore |
+| 📚 **Search History** | Per-device scan history stored and streamed in real-time from Firebase Firestore |
 | 🎨 **Modern UI/UX** | Dark theme with gradient backgrounds, glassmorphism effects, and smooth animations |
 | 📱 **Fully Responsive** | Optimized for desktop, tablet, and mobile viewports |
 | � **Brand Impersonation Detection** | Identifies domains mimicking trusted brands |
@@ -53,28 +53,28 @@ Enter any URL and get an instant risk assessment with a detailed breakdown of wh
 TrustProbe AI follows the **Stacked MVVM (Model-View-ViewModel)** architecture pattern with clean separation of concerns:
 
 ```
-+-----------------------------------------------------+
-|                      UI Layer                        |
-|  +-----------+  +------------+  +--------------+     |
-|  | HomeView  |  | ResultCard |  | HistoryTable |     |
-|  +-----+-----+  +-----+------+  +------+------+     |
-|        |               |               |             |
-|        +---------------+---------------+             |
-|                        |                             |
-+------------------------+-----------------------------+
-|                 ViewModel Layer                      |
-|            +--------------------+                    |
-|            |   HomeViewModel    |                    |
-|            |  (State + Logic)   |                    |
-|            +--------+-----------+                    |
-|                     |                                |
-+---------------------+-------------------------------+
-|                  Service Layer                       |
-|  +--------------+  +----------------+  +-----------+ |
-|  | AiService    |  | PhishingService|  | Firestore | |
-|  | (Llama 3.3)  |  | (Heuristics)  |  | Service   | |
-|  +--------------+  +----------------+  +-----------+ |
-+-----------------------------------------------------+
++--------------------------------------------------------------+
+|                         UI Layer                             |
+|  +-----------+   +------------+   +-----------------+        |
+|  | HomeView  |   | ResultCard |   | HistoryTable    |        |
+|  +-----+-----+   +-----+------+   +-------+---------+       |
+|        |               |                  |                  |
+|        +---------------+------------------+                  |
+|                        |                                     |
++------------------------+------------------------------------+
+|                    ViewModel Layer                            |
+|               +--------------------+                         |
+|               |   HomeViewModel    |                         |
+|               |  (State + Logic)   |                         |
+|               +--------+-----------+                         |
+|                        |                                     |
++------------------------+------------------------------------+
+|                     Service Layer                             |
+|  +-----------+  +-------------+  +----------+  +-----------+ |
+|  | AiService |  | PhishingSvc |  | Firestore|  | DeviceId  | |
+|  |(Llama 3.3)|  | (Heuristics)|  |  Service |  |  Service  | |
+|  +-----------+  +-------------+  +----------+  +-----------+ |
++--------------------------------------------------------------+
 ```
 
 ### Layer Responsibilities
@@ -85,7 +85,8 @@ TrustProbe AI follows the **Stacked MVVM (Model-View-ViewModel)** architecture p
 | **ViewModel** | `HomeViewModel` | State management, orchestrates services, handles user interactions |
 | **Service** | `PhishingService` | Core phishing detection engine (heuristic + AI) |
 | **Service** | `AiService` | LLM integration via Groq API (Llama 3.3 70B) |
-| **Service** | `FirestoreService` | Firebase Firestore CRUD for scan history |
+| **Service** | `FirestoreService` | Firebase Firestore CRUD for scan history (scoped by device) |
+| **Service** | `DeviceIdService` | Anonymous device identification via persistent UUID |
 | **Model** | `ScanResult` | Data structure for URL scan results with serialization |
 | **Config** | `AiConfig` | Centralized AI/API configuration |
 
@@ -110,7 +111,8 @@ TrustProbeAI/
 │   ├── services/
 │   │   ├── ai_service.dart              # Llama 3.3 70B integration via Groq API
 │   │   ├── phishing_service.dart        # Core phishing detection engine
-│   │   └── firestore_service.dart       # Firebase Firestore operations
+│   │   ├── firestore_service.dart       # Firebase Firestore operations (device-scoped)
+│   │   └── device_id_service.dart       # Anonymous device ID generation & persistence
 │   │
 │   ├── ui/
 │   │   ├── views/
@@ -211,8 +213,9 @@ When configured, the AI engine receives the heuristic results and provides:
 | **Architecture** | Stacked MVVM | State management & DI |
 | **AI Model** | Llama 3.3 70B (open-source) | Intelligent threat analysis |
 | **AI Provider** | Groq API | Ultra-fast LLM inference |
-| **Database** | Cloud Firestore | Real-time scan history |
+| **Database** | Cloud Firestore | Real-time per-device scan history |
 | **Firebase** | Firebase Core | Backend infrastructure |
+| **Device Identity** | shared_preferences + uuid | Anonymous device tracking |
 | **Typography** | Google Fonts (Poppins, Inter) | Modern UI typography |
 | **Design System** | Material Design 3 | UI components |
 | **HTTP Client** | `package:http` | API communication |
@@ -335,8 +338,9 @@ flutter test
 
 1. Analyze a few URLs in the app
 2. Open Firebase Console → Firestore Database
-3. Check that `url_scans` collection has documents
-4. Refresh app — previous scans should appear
+3. Check that `url_scans` collection has documents **with a `deviceId` field**
+4. Refresh app — only your device's scans should appear
+5. **Composite Index**: On first run, Firestore may prompt you to create a composite index for `(deviceId, timestamp)`. Click the link in the browser console to auto-create it.
 
 ---
 
@@ -394,7 +398,7 @@ service cloud.firestore {
   match /databases/{database}/documents {
     match /url_scans/{document=**} {
       allow read: if true;
-      allow write: if request.resource.data.keys().hasAll(['url', 'riskScore', 'classification']);
+      allow write: if request.resource.data.keys().hasAll(['url', 'riskScore', 'classification', 'deviceId']);
     }
   }
 }
